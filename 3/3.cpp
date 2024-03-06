@@ -1,20 +1,117 @@
-﻿// 3.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
+﻿#include <iostream>
+#include <omp.h>
+#include <windows.h>
+using namespace std;
 
-#include <iostream>
+#define MAX_SIZE 100
 
-int main()
+void printMatrix(double matrix[MAX_SIZE][MAX_SIZE + 1], int size) 
 {
-    std::cout << "Hello World!\n";
+    for (int i = 0; i < size; i++) 
+    {
+        for (int j = 0; j <= size; j++) 
+        {
+            cout << matrix[i][j] << "\t";
+        }
+        cout << endl;
+    }
 }
 
-// Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
-// Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
+void ForwardRunning(double A[MAX_SIZE][MAX_SIZE + 1], double x[MAX_SIZE], int size)
+{
+    int row, col;
+    for (col = 0; col < size - 1; col++)
+    {
+#pragma omp parallel for shared(A) private(row)
+        for (row = col + 1; row < size; row++)
+        {
+            if (A[col][col] == 0) {
 
-// Советы по началу работы 
-//   1. В окне обозревателя решений можно добавлять файлы и управлять ими.
-//   2. В окне Team Explorer можно подключиться к системе управления версиями.
-//   3. В окне "Выходные данные" можно просматривать выходные данные сборки и другие сообщения.
-//   4. В окне "Список ошибок" можно просматривать ошибки.
-//   5. Последовательно выберите пункты меню "Проект" > "Добавить новый элемент", чтобы создать файлы кода, или "Проект" > "Добавить существующий элемент", чтобы добавить в проект существующие файлы кода.
-//   6. Чтобы снова открыть этот проект позже, выберите пункты меню "Файл" > "Открыть" > "Проект" и выберите SLN-файл.
+                int swap_row = -1;
+                for (int k = col + 1; k < size; k++)
+                {
+                    if (A[k][col] != 0)
+                    {
+                        swap_row = k;
+                        break;
+                    }
+                }
+                if (swap_row == -1)
+                {
+                    cerr << "\nСистема не имеет решений или их кол-во бесконечно" << endl;
+                    exit(1);
+                }
+
+                for (int k = col; k <= size; k++)
+                {
+                    double temp = A[col][k];
+                    A[col][k] = A[swap_row][k];
+                    A[swap_row][k] = temp;
+                }
+            }
+
+            double ratio = A[row][col] / A[col][col];
+            for (int i = col; i <= size; i++) {
+                A[row][i] -= ratio * A[col][i];
+            }
+        }
+    }
+}
+
+void ReverseRunning(double A[MAX_SIZE][MAX_SIZE + 1], double x[MAX_SIZE], int size) 
+{
+    int row, col;
+    for (row = size - 1; row >= 0; row--) 
+    {
+        x[row] = A[row][size];
+        for (col = row + 1; col < size; col++) 
+        {
+            x[row] -= A[row][col] * x[col];
+        }
+        x[row] /= A[row][row];
+    }
+}
+
+int main() 
+{
+
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
+
+    int size;
+    double A[MAX_SIZE][MAX_SIZE + 1]; 
+    double x[MAX_SIZE];                
+
+    cout << "Введите количество уравнений и неизвестных: ";
+    cin >> size;
+
+    cout << "Введите коэффициенты уравнений:\n";
+    for (int i = 0; i < size; i++) 
+    {
+        cout << "\nУравнение " << i + 1 << ":\n";
+        for (int j = 0; j < size; j++) 
+        {
+            cout << "Коэффициент для переменной " << j + 1 << ": ";
+            cin >> A[i][j];
+        }
+        cout << "Введите свободный член: ";
+        cin >> A[i][size];
+    }
+
+    cout << "\nМатрица A до преобразований:\n";
+    printMatrix(A, size);
+
+    ForwardRunning(A, x, size);
+    ReverseRunning(A, x, size);
+
+    cout << "\nМатрица A после преобразований:\n";
+    printMatrix(A, size);
+
+    cout << "\nРешение:\n";
+    for (int i = 0; i < size; i++)
+    {
+        cout << "x"<< i+1 << " = " << x[i] << "\n";
+    }
+
+    return 0;
+}
