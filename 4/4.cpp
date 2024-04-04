@@ -1,20 +1,68 @@
-﻿// 4.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
+﻿#include <iostream>
+#include "mpi.h"
 
-#include <iostream>
+using namespace std;
 
-int main()
+#define SIZE 3
+
+void PrintMatrix(int m[SIZE][SIZE])
 {
-    std::cout << "Hello World!\n";
+    for (int i = 0; i < SIZE; i++)
+    {
+        for (int j = 0; j < SIZE; j++)
+        {
+            cout << m[i][j] << "\t";
+        }
+        cout << endl;
+    }
 }
 
-// Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
-// Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
+void GenerateRandomMatrix(int m[SIZE][SIZE])
+{
+    for (int i = 0; i < SIZE; i++) 
+    {
+        for (int j = 0; j < SIZE; j++) 
+        {
+            m[i][j] = rand() % 10;
+        }
+    }
+}
 
-// Советы по началу работы 
-//   1. В окне обозревателя решений можно добавлять файлы и управлять ими.
-//   2. В окне Team Explorer можно подключиться к системе управления версиями.
-//   3. В окне "Выходные данные" можно просматривать выходные данные сборки и другие сообщения.
-//   4. В окне "Список ошибок" можно просматривать ошибки.
-//   5. Последовательно выберите пункты меню "Проект" > "Добавить новый элемент", чтобы создать файлы кода, или "Проект" > "Добавить существующий элемент", чтобы добавить в проект существующие файлы кода.
-//   6. Чтобы снова открыть этот проект позже, выберите пункты меню "Файл" > "Открыть" > "Проект" и выберите SLN-файл.
+int main(int argc, char* argv[])
+{
+    int A[SIZE][SIZE];
+    int B[SIZE][SIZE];
+    int C[SIZE][SIZE] = { 0 };
+    MPI_Init(&argc, &argv);
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    if (rank == 0) 
+    {
+        GenerateRandomMatrix(A);
+        GenerateRandomMatrix(B);
+    }
+    int row[SIZE];
+    int resultRow[SIZE] = { 0 };
+    MPI_Scatter(A[0], SIZE, MPI_INT, row, SIZE, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(B[0], SIZE * SIZE, MPI_INT, 0, MPI_COMM_WORLD);
+    for (int i = 0; i < SIZE; i++) 
+    {
+        for (int j = 0; j < SIZE; j++) 
+        {
+            resultRow[i] += row[j] * B[j][i];
+        }     
+    }
+    MPI_Gather(resultRow, SIZE, MPI_INT, C[0], SIZE, MPI_INT, 0, MPI_COMM_WORLD);
+    if (rank == 0) 
+    {
+        cout << "\nA:\n";
+        PrintMatrix(A);
+        cout << "\nB:\n";
+        PrintMatrix(B);
+        cout << "\nC:\n";
+        PrintMatrix(C);
+    }
+    MPI_Finalize();
+    return 0;
+}
