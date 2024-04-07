@@ -21,39 +21,37 @@ void PrintMatrix(double matrix[SIZE][SIZE + 1])
 
 void ForwardRunning(double A[SIZE][SIZE + 1], int rank, int size)
 {
-    double AA[SIZE][SIZE + 1];
-    for (int col = 0; col < SIZE-1; col++) 
-    {   
+    MPI_Status status;
+    for (int col = 0; col < SIZE - 1; col++)
+    {
         MPI_Bcast(A, SIZE * (SIZE + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        for (int row = col + 1 + rank; row < SIZE; row+=size)
+        for (int row = col + 1 + rank; row < SIZE; row += size)
         {
             double ratio = A[row][col] / A[col][col];
-            for (int i = col; i <= SIZE; i++) 
+            for (int i = col; i <= SIZE; i++)
             {
                 A[row][i] -= ratio * A[col][i];
             }
-            if((rank==0 && col == 0) || rank != 0)
-            { 
-                MPI_Gather(A[row], (SIZE + 1), MPI_DOUBLE, AA[row], (SIZE + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        }
+        if (rank != 0) 
+        {
+            for (int row = col + 1 + rank; row < SIZE; row += size) 
+            {
+                MPI_Send(&A[row][0], SIZE + 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
             }
         }
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (rank == 0)
+        else 
         {
-            for (int i = 1; i < SIZE; i++)
+            for (int r = 1; r < size; r++) 
             {
-                if ((col + 1 + rank)%size != 0)
+                for (int row = col + 1 + r; row < SIZE; row += size) 
                 {
-                    for (int j = 0; j <= SIZE; j++)
-                    {
-                        A[i][j] = AA[i][j];
-                    }
+                    MPI_Recv(&A[row][0], SIZE + 1, MPI_DOUBLE, r, 0, MPI_COMM_WORLD, &status);
                 }
             }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
 
+        }
+    }
 }
 
 void ReverseRunning(double A[SIZE][SIZE + 1], double x[SIZE])
@@ -78,7 +76,6 @@ int main(int argc, char* argv[])
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Barrier(MPI_COMM_WORLD);
 
     if (rank == 0)
     {
@@ -87,7 +84,6 @@ int main(int argc, char* argv[])
     }
     
     ForwardRunning(A, rank, size);
-    MPI_Barrier(MPI_COMM_WORLD);
 
     if (rank == 0)
     {
