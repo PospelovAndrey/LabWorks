@@ -9,9 +9,9 @@ using namespace std;
 
 void PrintMatrix(int m[SIZE][SIZE])
 {
-    for (int i = 0; i < SIZE; i++)
+    for (size_t i = 0; i < SIZE; i++)
     {
-        for (int j = 0; j < SIZE; j++)
+        for (size_t j = 0; j < SIZE; j++)
         {
             cout << m[i][j] << "\t";
         }
@@ -21,9 +21,9 @@ void PrintMatrix(int m[SIZE][SIZE])
 
 void GenerateRandomMatrix(int m[SIZE][SIZE])
 {
-    for (int i = 0; i < SIZE; i++) 
+    for (size_t i = 0; i < SIZE; i++)
     {
-        for (int j = 0; j < SIZE; j++) 
+        for (size_t j = 0; j < SIZE; j++)
         {
             m[i][j] = rand() % 10;
         }
@@ -34,7 +34,7 @@ vector<int> ElementsPerProcesses(int size)
 {
     vector<int> elementsPerProcesses(size, (SIZE / size)*SIZE);
     int remaining = SIZE % size;
-    for (int i = 0; i < remaining; ++i)
+    for (size_t i = 0; i < remaining; ++i)
     {
         elementsPerProcesses[i] += SIZE;
     }
@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
             GenerateRandomMatrix(A);
             GenerateRandomMatrix(B);
             sendcounts = ElementsPerProcesses(size);           
-            for (int i = 0; i < size; i++)
+            for (size_t i = 0; i < size; i++)
             {
                 if (i > 0)
                     displs[i] = displs[i - 1] + sendcounts[i - 1];
@@ -68,7 +68,6 @@ int main(int argc, char* argv[])
                     displs[i] = 0;
             }
         }
-
         MPI_Bcast(B[0], SIZE * SIZE, MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(sendcounts.data(), sendcounts.size(), MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(displs.data(), displs.size(), MPI_INT, 0, MPI_COMM_WORLD);
@@ -76,11 +75,11 @@ int main(int argc, char* argv[])
         vector<int> rows(sendcounts[rank]);
         MPI_Scatterv(A, sendcounts.data(), displs.data(), MPI_INT, rows.data(), rows.size(), MPI_INT, 0, MPI_COMM_WORLD);
         vector<int>resultRows(rows.size());
-        for (int i = 0; i < rows.size() / SIZE; i++)
+        for (size_t i = 0; i < rows.size() / SIZE; i++)
         {
-            for (int j = 0; j < SIZE; j++)
+            for (size_t j = 0; j < SIZE; j++)
             {
-                for (int k = 0; k < SIZE; k++)
+                for (size_t k = 0; k < SIZE; k++)
                 {
                     resultRows[i * SIZE + j] += rows[i * SIZE + k] * B[k][j];
                 }

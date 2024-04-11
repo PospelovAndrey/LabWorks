@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include <mpi.h>
 #include <windows.h>
+#include <vector>
 
 using namespace std;
 
@@ -19,45 +20,51 @@ void PrintMatrix(double matrix[SIZE][SIZE + 1])
     }
 }
 
+vector<int> ElementsPerProcesses(int col, int size)
+{
+    vector<int> elementsPerProcesses(size, ((SIZE-1- col) / size) * (SIZE + 1));
+    int remaining = (SIZE-1- col) % size;
+    for (int i = 0; i < remaining; ++i)
+    {
+        elementsPerProcesses[i] += (SIZE + 1);
+    }
+    return elementsPerProcesses;
+}
+
 void ForwardRunning(double A[SIZE][SIZE + 1], int rank, int size)
 {
-    MPI_Status status;
+    vector<int> sendcounts(size);
+    vector<int> displs(size);
+
     for (int col = 0; col < SIZE - 1; col++)
     {
-        MPI_Bcast(A, SIZE * (SIZE + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        for (int row = col + 1 + rank; row < SIZE; row += size)
+        sendcounts = ElementsPerProcesses(col, size);
+        for (int i = 0; i < size; i++)
         {
-            double ratio = A[row][col] / A[col][col];
+            if (i > 0)
+                displs[i] = displs[i - 1] + sendcounts[i - 1];
+            else
+                displs[i] = 0;
+        }
+        MPI_Bcast(A[col], (SIZE + 1) , MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        vector<double>resultRows(sendcounts[rank]);
+        MPI_Scatterv(A[col+1], sendcounts.data(), displs.data(), MPI_DOUBLE, resultRows.data(), resultRows.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        for (int row = 0; row < resultRows.size() / (SIZE + 1); row++)
+        {
+           double ratio = resultRows[row * (SIZE + 1) + col] / A[col][col];
             for (int i = col; i <= SIZE; i++)
             {
-                A[row][i] -= ratio * A[col][i];
+                resultRows[row * (SIZE + 1) + i] -= ratio * A[col][i];
             }
         }
-        if (rank != 0) 
-        {
-            for (int row = col + 1 + rank; row < SIZE; row += size) 
-            {
-                MPI_Send(&A[row][0], SIZE + 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-            }
-        }
-        else 
-        {
-            for (int r = 1; r < size; r++) 
-            {
-                for (int row = col + 1 + r; row < SIZE; row += size) 
-                {
-                    MPI_Recv(&A[row][0], SIZE + 1, MPI_DOUBLE, r, 0, MPI_COMM_WORLD, &status);
-                }
-            }
-
-        }
+        MPI_Gatherv(resultRows.data(), sendcounts[rank], MPI_DOUBLE, A[col + 1], sendcounts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
 }
 
 void ReverseRunning(double A[SIZE][SIZE + 1], double x[SIZE])
 {
     int row, col;
-    for (row = SIZE - 1; row >= 0; row--)
+    for (row = (SIZE - 1); row >= 0; row--)
     {
         x[row] = A[row][SIZE];
         for (col = row + 1; col < SIZE; col++)
@@ -76,7 +83,6 @@ int main(int argc, char* argv[])
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
     if (rank == 0)
     {
         cout << "\nA before:\n";
